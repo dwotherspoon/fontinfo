@@ -57,7 +57,8 @@ namespace FontInfo
         public void TestPFB()
         {
             FontInfo fi = new FontInfo(@"C:\Windows\Fonts\serifab.pfb");
-            Assert.AreEqual(FontInfo.fontType.PFB, fi.Type);
+            fi.readInfo();
+            Assert.AreEqual(FontInfo.fontType.PFA, fi.Type);
         }
     }
 }

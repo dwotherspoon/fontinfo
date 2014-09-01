@@ -57,6 +57,12 @@ namespace FontInfo
                 case fontType.TTF:
                     parseOTF();
                     break;
+                case fontType.PFB:
+                    parsePFB();
+                    break;
+                case fontType.PFA:
+                    parsePFB();
+                    break;
                 default:
                     break;
             }
@@ -88,7 +94,11 @@ namespace FontInfo
         //http://freepcb.googlecode.com/svn/clibpdf/trunk/source/cpdfReadPFB.c
         private void parsePFB()
         {
-
+            UInt32 block_len = (UInt32)(reader.ReadByte() & 0xFF);
+            block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 8);
+            block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 16);
+            block_len |= (UInt32)((reader.ReadByte() & 0XFF) << 24);
+            Console.WriteLine("Block length: " + block_len);
         }
 
         //Functions for converting Motorola (Big) Endian -> Intel (Small) Endian
