@@ -24,8 +24,6 @@ namespace FontInfo
             if (!File.Exists(file)) throw new FileNotFoundException();
             this.reader = new BinaryReader(new FileStream(file, FileMode.Open, FileAccess.Read));
             byte[] magic_num = reader.ReadBytes(4);
-            Console.WriteLine("A:" + magic_num[0] + ", " + magic_num[1] + ", " + magic_num[2] + ", " + magic_num[3]);
-            Console.WriteLine("B:" + magic_num.Intersect(new byte[] { 0x00, 0x01, 0x00, 0x00 }).Count());
 
             if (magic_num.SequenceEqual(new byte[] {0x00, 0x01, 0x00, 0x00}))
             {
@@ -39,6 +37,14 @@ namespace FontInfo
             {
                 type = fontType.TTC;
             }
+            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x01}))
+            {
+                type = fontType.PFA;
+            }
+            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x02}))
+            {
+                type = fontType.PFB;
+            }
         }
 
         public void readInfo()
@@ -48,12 +54,17 @@ namespace FontInfo
                 case fontType.OTF:
                     parseOTF();
                     break;
+                case fontType.TTF:
+                    parseOTF();
+                    break;
                 default:
                     break;
             }
         }
 
+
         //From: http://www.microsoft.com/typography/otspec/otff.htm
+        //http://web.mit.edu/andersk/src/t1utils-1.32/t1lib.c
         private void parseOTF()
         {
             //read the OffSet Table (everything after sfnt version)
@@ -74,6 +85,13 @@ namespace FontInfo
 
         }
 
+        //http://freepcb.googlecode.com/svn/clibpdf/trunk/source/cpdfReadPFB.c
+        private void parsePFB()
+        {
+
+        }
+
+        //Functions for converting Motorola (Big) Endian -> Intel (Small) Endian
         public static UInt32 reverse(UInt32 value)
         {
             return (value & 0x000000FFU) << 24 | (value & 0x0000FF00U) << 8 |
@@ -138,7 +156,7 @@ namespace FontInfo
             public UInt16 nameID;
             public UInt16 length;
             public UInt16 offset;
-            public string str;
+            public String str;
 
             //accept a BinaryReader and offset for string data.
             public NameRecord(BinaryReader r, long soffset)
@@ -151,7 +169,7 @@ namespace FontInfo
                 offset = FontInfo.reverse(r.ReadUInt16());
                 long ipos = r.BaseStream.Position;
                 r.BaseStream.Seek(soffset + offset, SeekOrigin.Begin);
-                str = new string(r.ReadChars(length));
+                str =  ASCIIEncoding.UTF8.GetString(r.ReadBytes(length));
                 //seek back to start of next name record.
                 r.BaseStream.Seek(ipos, SeekOrigin.Begin);
             }
