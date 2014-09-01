@@ -10,6 +10,9 @@ namespace FontInfo
     {
         static void Main(string[] args)
         {
+            FontInfo fi = new FontInfo(@"C:\Windows\Fonts\MYRIADPRO-REGULAR.OTF");
+            fi.readInfo();
+            Console.ReadLine();
         }
     }
 }

@@ -68,7 +68,7 @@ namespace FontInfo
                 tables.Add(FTable.parseTable(reader));
                 if (new string(tables.Last().tag) == "name")
                 {
-                    tables.Last().readPayload(reader);
+                    new FTable_Name(reader, tables.Last());
                 }
             }
 
@@ -85,18 +85,52 @@ namespace FontInfo
             return (UInt16)((value & 0xFFU) << 8 | (value & 0xFF00U) >> 8);
         }
     }
-    //for OTF/TTF
+#region OTF/TTF
 
     /* Name table */
     class FTable_Name
     {
+        public FTable entry;
         public UInt16 format;
         public UInt16 count;
         public UInt16 stringOffset;
+        public UInt16 langTagCount;
         public List<NameRecord> nameRecords;
+        public List<LangTagRecord> langTagRecords;
+
+        public FTable_Name(BinaryReader r, FTable entry)
+        {
+            nameRecords = new List<NameRecord>();
+            this.entry = entry;
+            //store current position.
+            long start = r.BaseStream.Position;
+            //seek the table.
+            r.BaseStream.Seek(entry.offset, SeekOrigin.Begin);
+            format = FontInfo.reverse(r.ReadUInt16());
+            count = FontInfo.reverse(r.ReadUInt16());
+            stringOffset = FontInfo.reverse(r.ReadUInt16());
+            //read name records...
+            for (int i = 0; i < count; i++)
+            {
+                nameRecords.Add(new NameRecord(r, entry.offset + stringOffset));
+                Console.WriteLine(nameRecords.Last().str);
+            }
+            //Format v1? Then we have lang tags too.
+            if (format == 1)
+            {
+                langTagRecords = new List<LangTagRecord>();
+                langTagCount = FontInfo.reverse(r.ReadUInt16());
+                for (int i = 0; i < langTagCount; i++)
+                {
+                    langTagRecords.Add(new LangTagRecord(r, entry.offset + stringOffset));
+                    Console.WriteLine(langTagRecords.Last().str);
+                }
+            }
+            r.BaseStream.Seek(start, SeekOrigin.Begin);
+        }
 
         //Name records...
-        class NameRecord
+        public class NameRecord
         {
             public UInt16 platformID;
             public UInt16 encodingID;
@@ -106,17 +140,40 @@ namespace FontInfo
             public UInt16 offset;
             public string str;
 
-
-            NameRecord(BinaryReader r, long soffset)
+            //accept a BinaryReader and offset for string data.
+            public NameRecord(BinaryReader r, long soffset)
             {
                 platformID = FontInfo.reverse(r.ReadUInt16());
                 encodingID = FontInfo.reverse(r.ReadUInt16());
                 languageID = FontInfo.reverse(r.ReadUInt16());
                 nameID = FontInfo.reverse(r.ReadUInt16());
+                length = FontInfo.reverse(r.ReadUInt16());
+                offset = FontInfo.reverse(r.ReadUInt16());
                 long ipos = r.BaseStream.Position;
-
+                r.BaseStream.Seek(soffset + offset, SeekOrigin.Begin);
+                str = new string(r.ReadChars(length));
+                //seek back to start of next name record.
+                r.BaseStream.Seek(ipos, SeekOrigin.Begin);
             }
+        }
 
+        public class LangTagRecord
+        {
+            public UInt16 length;
+            public UInt16 offset;
+
+            public string str;
+
+            //accept a BinaryReader and offset for string data.
+            public LangTagRecord(BinaryReader r, long soffset)
+            {
+                length = FontInfo.reverse(r.ReadUInt16());
+                offset = FontInfo.reverse(r.ReadUInt16());
+                long ipos = r.BaseStream.Position;
+                r.BaseStream.Seek(soffset + offset, SeekOrigin.Begin);
+                str = new string(r.ReadChars(length));
+                r.BaseStream.Seek(ipos, SeekOrigin.Begin);
+            }
         }
     }
 
@@ -130,8 +187,7 @@ namespace FontInfo
         public byte[] payload;
 
         private FTable()
-        {
-        }
+        { }
 
         public static FTable parseTable(BinaryReader reader)
         {
@@ -146,7 +202,7 @@ namespace FontInfo
             //res.payload = reader.ReadBytes((int)res.length - 16);
             return res;
         }
-
+        
         public void readPayload(BinaryReader reader)
         {
             long ipos = reader.BaseStream.Position;
@@ -155,4 +211,5 @@ namespace FontInfo
             reader.BaseStream.Seek(ipos, SeekOrigin.Begin);
         }
     }
+#endregion
 }
