@@ -157,8 +157,8 @@ namespace FontInfo
 
         private static void parsePfLine(Dictionary<string, string> dict, string line)
         {
-            string key = new string(line.SkipWhile(v => v == ' ').TakeWhile(v => v != ' ').ToArray());
-            string value = new string(line.SkipWhile(v => v == ' ').Skip(key.Length).SkipWhile(v => v == ' ').ToArray());
+            string key = new string(line.Skip(1).TakeWhile(char.IsLetter).ToArray());
+            string value = new string(line.Skip(key.Length + 1).SkipWhile(char.IsWhiteSpace).TakeWhile(c => c != '\n').ToArray());
             if (brackets.ContainsKey(value[0]))
             {
                 //Find the last closing bracket and use that as the value
@@ -246,19 +246,20 @@ namespace FontInfo
             block_len |= (UInt32)((reader.ReadByte() & 0XFF) << 24);
             //read ascii
             string str = ASCIIEncoding.UTF8.GetString(reader.ReadBytes((int)block_len));
+            str = str.Replace('\r', '\n');
             Dictionary<string, string> dictPfb = new Dictionary<string, string>();
 
             parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/FullName")).TakeWhile(c => c != '\r').ToArray()));
-            fullName = dictPfb["/FullName"];
+            fullName = dictPfb["FullName"];
 
             parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/FamilyName")).TakeWhile(c => c != '\r').ToArray()));
-            familyName = dictPfb["/FamilyName"];
+            familyName = dictPfb["FamilyName"];
 
             parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/version")).TakeWhile(c => c != '\r').ToArray()));
-            version = dictPfb["/version"];
+            version = dictPfb["version"];
 
             parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/Weight")).TakeWhile(c => c != '\r').ToArray()));
-            weight = dictPfb["/Weight"];
+            weight = dictPfb["Weight"];
         }
 
         public override string ToString()
