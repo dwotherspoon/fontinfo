@@ -10,7 +10,7 @@ namespace FontInfo
 {
     public class FontInfo
     {
-        public enum fontType { TTF, OTF, FON, TTC, PFB, PFA, ERR};
+        public enum fontType { TTF, OTF, FON, TTC, PFB, PFA, ERR };
         private fontType type = fontType.ERR;
         public fontType Type
         {
@@ -41,6 +41,12 @@ namespace FontInfo
             get { return weight; }
         }
 
+        private string file;
+        public string Path
+        {
+            get { return file; }
+        }
+
         //Convenience dictionary. No hard and fast ASCII rule for doing this.
         private static Dictionary<char, char> brackets = new Dictionary<char, char>
         {
@@ -55,15 +61,16 @@ namespace FontInfo
 
         public FontInfo(string file)
         {
+            this.file = file;
             if (!File.Exists(file)) throw new FileNotFoundException();
             this.reader = new BinaryReader(new FileStream(file, FileMode.Open, FileAccess.Read));
             byte[] magic_num = reader.ReadBytes(4);
 
-            if (magic_num.SequenceEqual(new byte[] {0x00, 0x01, 0x00, 0x00}))
+            if (magic_num.SequenceEqual(new byte[] { 0x00, 0x01, 0x00, 0x00 }))
             {
                 type = fontType.TTF;
             }
-            else if (magic_num.SequenceEqual(new byte[] {0x4F, 0x54, 0x54, 0x4F}))
+            else if (magic_num.SequenceEqual(new byte[] { 0x4F, 0x54, 0x54, 0x4F }))
             {
                 type = fontType.OTF;
             }
@@ -71,17 +78,17 @@ namespace FontInfo
             {
                 type = fontType.TTC;
             }
-            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x01}))
+            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x01 }))
             {
                 type = fontType.PFA;
             }
-            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x02}))
+            else if (magic_num.Take(2).SequenceEqual(new byte[] { 0x80, 0x02 }))
             {
                 type = fontType.PFB;
             }
         }
 
-        public void readInfo()
+        public FontInfo readInfo()
         {
             switch (this.type)
             {
@@ -101,6 +108,7 @@ namespace FontInfo
                     break;
             }
             reader.Dispose();
+            return this;
         }
 
 
@@ -124,10 +132,27 @@ namespace FontInfo
                     ntable = new FTable_Name(reader, tables.Last());
                 }
             }
-            fullName = ntable.getString(4, 0, 1, 0);
-            familyName = ntable.getString(1, 0, 1, 0);
-            version = ntable.getString(5, 0, 1, 0);
-            weight = ntable.getString(2, 0, 1, 0);
+                if (ntable.hasRecord(4, 0, 1, 0))
+                {
+                    fullName = ntable.getString(4, 0, 1, 0);
+                    familyName = ntable.getString(1, 0, 1, 0);
+                    version = ntable.getString(5, 0, 1, 0);
+                    weight = ntable.getString(2, 0, 1, 0);
+                }
+                else if (ntable.hasRecord(4, 0x409, 3, 1))
+                {
+                    fullName = ntable.getString(4, 0x409, 3, 1);
+                    familyName = ntable.getString(1, 0x409, 3, 1);
+                    version = ntable.getString(5, 0x409, 3, 1);
+                    weight = ntable.getString(2, 0x409, 3, 1);
+                }
+                else
+                {
+                    fullName = "ERR";
+                    familyName = "ERR";
+                    version = "ERR";
+                    weight = "ERR";
+                }
         }
 
         private static void parsePfLine(Dictionary<string, string> dict, string line)
@@ -218,7 +243,7 @@ namespace FontInfo
             return (UInt16)((value & 0xFFU) << 8 | (value & 0xFF00U) >> 8);
         }
     }
-#region OTF/TTF
+    #region OTF/TTF
 
     /* Name table */
     class FTable_Name
@@ -249,6 +274,7 @@ namespace FontInfo
                 //Console.WriteLine(nameRecords.Last().ToString());
             }
             //Format v1? Then we have lang tags too.
+            Console.WriteLine("FMT: " + format);
             if (format == 1)
             {
                 langTagRecords = new List<LangTagRecord>();
@@ -256,6 +282,7 @@ namespace FontInfo
                 for (int i = 0; i < langTagCount; i++)
                 {
                     langTagRecords.Add(new LangTagRecord(r, entry.offset + stringOffset));
+                    //Console.WriteLine(langTagRecords.Last().ToString());
                 }
             }
             r.BaseStream.Seek(start, SeekOrigin.Begin);
@@ -268,7 +295,28 @@ namespace FontInfo
         // 6 = PS name
         public string getString(UInt16 nameID, UInt16 languageID, UInt16 platformID, UInt16 encodingID)
         {
-            return nameRecords.Find(f => f.languageID == languageID && f.nameID == nameID && f.platformID == platformID && f.encodingID == encodingID).str;
+            var bytes = nameRecords.Find(f => f.languageID == languageID && f.nameID == nameID && f.platformID == platformID && f.encodingID == encodingID).str;
+            //reverse the endian of UTF16...
+            if (platformID == 3 && (bytes.Length % 2 == 0))
+            {
+                byte t;
+                for (int i = 0; i < bytes.Length; i += 2)
+                {
+                    t = bytes[i];
+                    bytes[i] = bytes[i + 1];
+                    bytes[i + 1] = t;
+                }
+                return UnicodeEncoding.Unicode.GetString(bytes);
+            }
+            else
+            {
+                return ASCIIEncoding.UTF8.GetString(bytes);
+            }
+        }
+
+        public bool hasRecord(UInt16 nameID, UInt16 languageID, UInt16 platformID, UInt16 encodingID)
+        {
+            return nameRecords.Where(f => f.languageID == languageID && f.nameID == nameID && f.platformID == platformID && f.encodingID == encodingID).Any();
         }
 
 
@@ -282,7 +330,7 @@ namespace FontInfo
             public UInt16 nameID;
             public UInt16 length;
             public UInt16 offset;
-            public String str;
+            public byte[] str;
 
             //accept a BinaryReader and offset for string data.
             public NameRecord(BinaryReader r, long soffset)
@@ -295,7 +343,7 @@ namespace FontInfo
                 offset = FontInfo.reverse(r.ReadUInt16());
                 long ipos = r.BaseStream.Position;
                 r.BaseStream.Seek(soffset + offset, SeekOrigin.Begin);
-                str =  ASCIIEncoding.UTF8.GetString(r.ReadBytes(length));
+                str = r.ReadBytes(length);
                 //seek back to start of next name record.
                 r.BaseStream.Seek(ipos, SeekOrigin.Begin);
             }
@@ -324,6 +372,11 @@ namespace FontInfo
                 str = new string(r.ReadChars(length));
                 r.BaseStream.Seek(ipos, SeekOrigin.Begin);
             }
+
+            public override string ToString()
+            {
+                return string.Format("LangTagRecord:\r\n\tpID: {0}\r\n", str);
+            }
         }
     }
 
@@ -349,7 +402,7 @@ namespace FontInfo
             //res.payload = reader.ReadBytes((int)res.length - 16);
             return res;
         }
-        
+
         public void readPayload(BinaryReader reader)
         {
             long ipos = reader.BaseStream.Position;
@@ -358,5 +411,5 @@ namespace FontInfo
             reader.BaseStream.Seek(ipos, SeekOrigin.Begin);
         }
     }
-#endregion
+    #endregion
 }

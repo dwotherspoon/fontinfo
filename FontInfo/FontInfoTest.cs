@@ -51,6 +51,13 @@ namespace FontInfo
             fi5.readInfo();
             Console.WriteLine(fi5.ToString());
 
+            Console.WriteLine("Arimo-Bold.ttf");
+            FontInfo fi6 = new FontInfo(@"C:\Windows\Fonts\Arimo-Bold.ttf");
+            fi6.readInfo();
+            Console.WriteLine(fi6.ToString());
+
+
+
 
             /*
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\MyriadPro-Bold.otf");
