@@ -58,6 +58,9 @@ namespace FontInfo
         {
             FontInfo fi = new FontInfo(@"C:\Windows\Fonts\serifab.pfb");
             fi.readInfo();
+
+            FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\SEAGULLH.pfb");
+            fi2.readInfo();
             Assert.AreEqual(FontInfo.fontType.PFA, fi.Type);
         }
     }

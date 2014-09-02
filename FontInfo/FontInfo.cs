@@ -17,6 +17,10 @@ namespace FontInfo
             get { return type; }
         }
 
+        private string fullName;
+        private string familyName;
+
+
         private BinaryReader reader;
 
         public FontInfo(string file)
@@ -70,7 +74,6 @@ namespace FontInfo
 
 
         //From: http://www.microsoft.com/typography/otspec/otff.htm
-        //http://web.mit.edu/andersk/src/t1utils-1.32/t1lib.c
         private void parseOTF()
         {
             //read the OffSet Table (everything after sfnt version)
@@ -92,13 +95,66 @@ namespace FontInfo
         }
 
         //http://freepcb.googlecode.com/svn/clibpdf/trunk/source/cpdfReadPFB.c
+        //http://web.mit.edu/andersk/src/t1utils-1.32/t1lib.c
         private void parsePFB()
         {
+            //go back 2 bytes (we overread on magicnum)
+            reader.BaseStream.Seek(2, SeekOrigin.Begin);
+            //read block length
             UInt32 block_len = (UInt32)(reader.ReadByte() & 0xFF);
             block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 8);
             block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 16);
             block_len |= (UInt32)((reader.ReadByte() & 0XFF) << 24);
+            //read ascii
+            string str = ASCIIEncoding.UTF8.GetString(reader.ReadBytes((int)block_len));
+            str = str.Replace('\r', '\n'); //change all returns to new lines
+            str = str.Replace((char)0x20, ' '); //Remove DLE
+            List<string> lines = str.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            //remove comments.
+            lines.RemoveAll(line => line[0] == '%');
+            Dictionary<string, string> dictMain = new Dictionary<string, string>();
+            Dictionary<string, string> dictFontInfo = new Dictionary<string, string>();
+            int lenMain = 0;
+            int lenInfo = 0;
+            //read out dictionarys
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i].StartsWith(@"/FontInfo"))
+                {
+                    lenInfo = Convert.ToInt32(new string(lines[i].Substring(10).TakeWhile(c => c >= '0' && c <= '9').ToArray()));
+                    for (int c = 0; c < lenInfo; c++)
+                    {
+                        i++;
+                        string key = new string(lines[i].SkipWhile(v => v == ' ').TakeWhile(v => v != ' ').ToArray());
+                        string value = new string(lines[i].SkipWhile(v => v == ' ').Skip(key.Length).SkipWhile(v => v == ' ').ToArray());
+                        //n.b. what if string has a bracket in?
+                        if (value[0] == '(')
+                        {
+                            value = new string(value.Skip(1).TakeWhile(v => v != ')').ToArray());
+                        }
+                        else
+                        {
+                            value = new string(value.TakeWhile(v => v != ' ').ToArray());
+                        }
+
+                        dictFontInfo[key] = value;
+                        Console.WriteLine(dictFontInfo.Last().ToString());
+                    }
+                }
+                else if (lines[i].Contains("dict") && lines[i].EndsWith("begin"))
+                {
+                    lenMain = Convert.ToInt32(new string(lines[i].TakeWhile(c => c >= '0' && c <= '9').ToArray()));
+                    Console.WriteLine("lenMain: " + lenMain);
+                }
+                else if (lines[i].StartsWith("/"))
+                {
+                }
+
+            }
+
+
             Console.WriteLine("Block length: " + block_len);
+            Console.WriteLine(String.Join("\r\n", lines));
         }
 
         //Functions for converting Motorola (Big) Endian -> Intel (Small) Endian
