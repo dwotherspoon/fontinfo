@@ -173,6 +173,7 @@ namespace FontInfo
             dict[key] = value;
         }
 
+        /*
         //http://freepcb.googlecode.com/svn/clibpdf/trunk/source/cpdfReadPFB.c
         //http://web.mit.edu/andersk/src/t1utils-1.32/t1lib.c
         private void parsePFB()
@@ -231,6 +232,33 @@ namespace FontInfo
             this.familyName = dictFontInfo["FamilyName"];
             this.version = dictFontInfo["version"];
             this.weight = dictFontInfo["Weight"];
+        } */
+
+        //temporary hack for now.
+        private void parsePFB()
+        {
+            //go back 2 bytes (we overread on magicnum)
+            reader.BaseStream.Seek(2, SeekOrigin.Begin);
+            //read block length
+            UInt32 block_len = (UInt32)(reader.ReadByte() & 0xFF);
+            block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 8);
+            block_len |= (UInt32)((reader.ReadByte() & 0xFF) << 16);
+            block_len |= (UInt32)((reader.ReadByte() & 0XFF) << 24);
+            //read ascii
+            string str = ASCIIEncoding.UTF8.GetString(reader.ReadBytes((int)block_len));
+            Dictionary<string, string> dictPfb = new Dictionary<string, string>();
+
+            parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/FullName")).TakeWhile(c => c != '\r').ToArray()));
+            fullName = dictPfb["/FullName"];
+
+            parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/FamilyName")).TakeWhile(c => c != '\r').ToArray()));
+            familyName = dictPfb["/FamilyName"];
+
+            parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/version")).TakeWhile(c => c != '\r').ToArray()));
+            version = dictPfb["/version"];
+
+            parsePfLine(dictPfb, new string(str.Skip(str.IndexOf("/Weight")).TakeWhile(c => c != '\r').ToArray()));
+            weight = dictPfb["/Weight"];
         }
 
         public override string ToString()
