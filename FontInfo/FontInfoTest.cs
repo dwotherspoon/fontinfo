@@ -29,9 +29,28 @@ namespace FontInfo
             Console.WriteLine("TIMES");
             FontInfo fi = new FontInfo(@"C:\Windows\Fonts\times.ttf");
             fi.readInfo();
+            Console.WriteLine(fi.ToString());
+
             Console.WriteLine("AMIRI");
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\amiri-regular.ttf");
             fi2.readInfo();
+            Console.WriteLine(fi2.ToString());
+
+            Console.WriteLine("AMIRI BOLD");
+            FontInfo fi3 = new FontInfo(@"C:\Windows\Fonts\amiri-bold.ttf");
+            fi3.readInfo();
+            Console.WriteLine(fi3.ToString());
+
+            Console.WriteLine("Proxima Nova Cond Sbold");
+            FontInfo fi4 = new FontInfo(@"C:\Windows\Fonts\Proxima Nova Cond Sbold.ttf");
+            fi4.readInfo();
+            Console.WriteLine(fi4.ToString());
+
+            Console.WriteLine("advee___");
+            FontInfo fi5 = new FontInfo(@"C:\3B2WIN\advee___.ttf");
+            fi5.readInfo();
+            Console.WriteLine(fi5.ToString());
+
 
             /*
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\MyriadPro-Bold.otf");
@@ -50,6 +69,7 @@ namespace FontInfo
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\PoplarStd.otf");
             //fi.readInfo();
             fi2.readInfo();
+            Console.WriteLine(fi2.ToString());
             //Assert.AreEqual(FontInfo.fontType.OTF, fi.Type);
         }
 
@@ -58,9 +78,11 @@ namespace FontInfo
         {
             FontInfo fi = new FontInfo(@"C:\Windows\Fonts\serifab.pfb");
             fi.readInfo();
+            Console.WriteLine(fi.ToString());
 
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\SEAGULLH.pfb");
             fi2.readInfo();
+            Console.WriteLine(fi2.ToString());
             Assert.AreEqual(FontInfo.fontType.PFA, fi.Type);
         }
     }

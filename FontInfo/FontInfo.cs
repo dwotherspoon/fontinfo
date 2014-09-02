@@ -18,7 +18,37 @@ namespace FontInfo
         }
 
         private string fullName;
+        public string FullName
+        {
+            get { return fullName; }
+        }
+
         private string familyName;
+        public string FamilyName
+        {
+            get { return familyName; }
+        }
+
+        private string version;
+        public string Version
+        {
+            get { return version; }
+        }
+
+        private string weight;
+        public string Weight
+        {
+            get { return weight; }
+        }
+
+        //Convenience dictionary. No hard and fast ASCII rule for doing this.
+        private static Dictionary<char, char> brackets = new Dictionary<char, char>
+        {
+            {'(', ')'},
+            {'[', ']'},
+            {'{', '}'},
+            {'⟨', '〉'}
+        };
 
 
         private BinaryReader reader;
@@ -70,6 +100,7 @@ namespace FontInfo
                 default:
                     break;
             }
+            reader.Dispose();
         }
 
 
@@ -78,20 +109,42 @@ namespace FontInfo
         {
             //read the OffSet Table (everything after sfnt version)
             UInt16 numTables = reverse(reader.ReadUInt16());
-            Console.WriteLine("numTables: " + numTables);
+            //Console.WriteLine("numTables: " + numTables);
             UInt16 searchRange = reverse(reader.ReadUInt16());
             UInt16 entrySelector = reverse(reader.ReadUInt16());
             UInt16 rangeShift = reverse(reader.ReadUInt16());
             List<FTable> tables = new List<FTable>();
+            FTable_Name ntable = null;
+
             for (int t = 0; t < numTables; t++)
             {
                 tables.Add(FTable.parseTable(reader));
                 if (new string(tables.Last().tag) == "name")
                 {
-                    new FTable_Name(reader, tables.Last());
+                    ntable = new FTable_Name(reader, tables.Last());
                 }
             }
+            fullName = ntable.getString(4, 0, 1, 0);
+            familyName = ntable.getString(1, 0, 1, 0);
+            version = ntable.getString(5, 0, 1, 0);
+            weight = ntable.getString(2, 0, 1, 0);
+        }
 
+        private static void parsePfLine(Dictionary<string, string> dict, string line)
+        {
+            string key = new string(line.SkipWhile(v => v == ' ').TakeWhile(v => v != ' ').ToArray());
+            string value = new string(line.SkipWhile(v => v == ' ').Skip(key.Length).SkipWhile(v => v == ' ').ToArray());
+            //n.b. what if string has the matching parentheses in
+            if (brackets.ContainsKey(value[0]))
+            {
+                value = new string(value.Skip(1).TakeWhile(v => v != brackets[value[0]]).ToArray());
+            }
+            else
+            {
+                value = new string(value.TakeWhile(v => v != ' ').ToArray());
+            }
+
+            dict[key] = value;
         }
 
         //http://freepcb.googlecode.com/svn/clibpdf/trunk/source/cpdfReadPFB.c
@@ -125,36 +178,32 @@ namespace FontInfo
                     for (int c = 0; c < lenInfo; c++)
                     {
                         i++;
-                        string key = new string(lines[i].SkipWhile(v => v == ' ').TakeWhile(v => v != ' ').ToArray());
-                        string value = new string(lines[i].SkipWhile(v => v == ' ').Skip(key.Length).SkipWhile(v => v == ' ').ToArray());
-                        //n.b. what if string has a bracket in?
-                        if (value[0] == '(')
-                        {
-                            value = new string(value.Skip(1).TakeWhile(v => v != ')').ToArray());
-                        }
-                        else
-                        {
-                            value = new string(value.TakeWhile(v => v != ' ').ToArray());
-                        }
-
-                        dictFontInfo[key] = value;
-                        Console.WriteLine(dictFontInfo.Last().ToString());
+                        parsePfLine(dictFontInfo, lines[i]);
+                        //Console.WriteLine(dictFontInfo.Last().ToString());
                     }
+                    //Console.WriteLine("------");
                 }
                 else if (lines[i].Contains("dict") && lines[i].EndsWith("begin"))
                 {
                     lenMain = Convert.ToInt32(new string(lines[i].TakeWhile(c => c >= '0' && c <= '9').ToArray()));
-                    Console.WriteLine("lenMain: " + lenMain);
+                    //Console.WriteLine("lenMain: " + lenMain);
                 }
                 else if (lines[i].StartsWith("/"))
                 {
+                    parsePfLine(dictMain, lines[i]);
+                    //Console.WriteLine(dictMain.Last().ToString());
                 }
 
             }
+            this.fullName = dictFontInfo["/FullName"];
+            this.familyName = dictFontInfo["/FamilyName"];
+            this.version = dictFontInfo["/version"];
+            this.weight = dictFontInfo["/Weight"];
+        }
 
-
-            Console.WriteLine("Block length: " + block_len);
-            Console.WriteLine(String.Join("\r\n", lines));
+        public override string ToString()
+        {
+            return string.Format("FontInfo:\r\n\tfullName: {0}\r\n\tfamilyName: {1}\r\n\tweight: {2}\r\n\tversion: {3}\r\n", fullName, familyName, weight, version);
         }
 
         //Functions for converting Motorola (Big) Endian -> Intel (Small) Endian
@@ -197,7 +246,7 @@ namespace FontInfo
             for (int i = 0; i < count; i++)
             {
                 nameRecords.Add(new NameRecord(r, entry.offset + stringOffset));
-                Console.WriteLine(nameRecords.Last().str);
+                //Console.WriteLine(nameRecords.Last().ToString());
             }
             //Format v1? Then we have lang tags too.
             if (format == 1)
@@ -207,11 +256,22 @@ namespace FontInfo
                 for (int i = 0; i < langTagCount; i++)
                 {
                     langTagRecords.Add(new LangTagRecord(r, entry.offset + stringOffset));
-                    Console.WriteLine(langTagRecords.Last().str);
                 }
             }
             r.BaseStream.Seek(start, SeekOrigin.Begin);
         }
+
+        // 2 = sub family
+        // 3 = Unique ID
+        // 4 = full name
+        // 5 = version
+        // 6 = PS name
+        public string getString(UInt16 nameID, UInt16 languageID, UInt16 platformID, UInt16 encodingID)
+        {
+            return nameRecords.Find(f => f.languageID == languageID && f.nameID == nameID && f.platformID == platformID && f.encodingID == encodingID).str;
+        }
+
+
 
         //Name records...
         public class NameRecord
@@ -238,6 +298,12 @@ namespace FontInfo
                 str =  ASCIIEncoding.UTF8.GetString(r.ReadBytes(length));
                 //seek back to start of next name record.
                 r.BaseStream.Seek(ipos, SeekOrigin.Begin);
+            }
+
+            public override string ToString()
+            {
+                return string.Format("NameRecord:\r\n\tpID: {0}\r\n\teID: {1}\r\n\tlID:{2}\r\n\tnID: {3}\r\n\tstring: {4}\r\n",
+                                        platformID, encodingID, languageID, nameID, str);
             }
         }
 
@@ -277,12 +343,9 @@ namespace FontInfo
         {
             FTable res = new FTable();
             res.tag = reader.ReadChars(4);
-            Console.WriteLine(new string(res.tag));
-
             res.checkSum = FontInfo.reverse(reader.ReadUInt32());
             res.offset = FontInfo.reverse(reader.ReadUInt32());
             res.length = FontInfo.reverse(reader.ReadUInt32());
-            Console.WriteLine("Length: " + res.length);
             //res.payload = reader.ReadBytes((int)res.length - 16);
             return res;
         }
