@@ -159,10 +159,11 @@ namespace FontInfo
         {
             string key = new string(line.SkipWhile(v => v == ' ').TakeWhile(v => v != ' ').ToArray());
             string value = new string(line.SkipWhile(v => v == ' ').Skip(key.Length).SkipWhile(v => v == ' ').ToArray());
-            //n.b. what if string has the matching parentheses in
             if (brackets.ContainsKey(value[0]))
             {
-                value = new string(value.Skip(1).TakeWhile(v => v != brackets[value[0]]).ToArray());
+                //Find the last closing bracket and use that as the value
+                int close_pos = value.LastIndexOf(brackets[value[0]]) - 1;
+                value = new string(value.Skip(1).Take(close_pos).ToArray());
             }
             else
             {
@@ -187,9 +188,14 @@ namespace FontInfo
             string str = ASCIIEncoding.UTF8.GetString(reader.ReadBytes((int)block_len));
             str = str.Replace('\r', '\n'); //change all returns to new lines
             str = str.Replace((char)0x20, ' '); //Remove DLE
-            List<string> lines = str.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            List<string> lines = str.Split(new string[] { "\n/", "\n  /", "\ncurrent", "\nend"}, StringSplitOptions.RemoveEmptyEntries).ToList();
             //remove comments.
             lines.RemoveAll(line => line[0] == '%');
+            //remove blank line
+            lines.RemoveAll(line => line.Trim() == "");
+
+            //Console.WriteLine(String.Join("\r\n", lines));
+
             Dictionary<string, string> dictMain = new Dictionary<string, string>();
             Dictionary<string, string> dictFontInfo = new Dictionary<string, string>();
             int lenMain = 0;
@@ -197,9 +203,9 @@ namespace FontInfo
             //read out dictionarys
             for (int i = 0; i < lines.Count; i++)
             {
-                if (lines[i].StartsWith(@"/FontInfo"))
+                if (lines[i].StartsWith(@"FontInfo"))
                 {
-                    lenInfo = Convert.ToInt32(new string(lines[i].Substring(10).TakeWhile(c => c >= '0' && c <= '9').ToArray()));
+                    lenInfo = Convert.ToInt32(new string(lines[i].Substring(9).TakeWhile(c => c >= '0' && c <= '9').ToArray()));
                     for (int c = 0; c < lenInfo; c++)
                     {
                         i++;
@@ -210,20 +216,21 @@ namespace FontInfo
                 }
                 else if (lines[i].Contains("dict") && lines[i].EndsWith("begin"))
                 {
-                    lenMain = Convert.ToInt32(new string(lines[i].TakeWhile(c => c >= '0' && c <= '9').ToArray()));
+                    //Console.WriteLine("THIS: " + lines[i]);
+                    //lenMain = Convert.ToInt32("0" + new string(lines[i].TakeWhile(c => c >= '0' && c <= '9').ToArray()));
                     //Console.WriteLine("lenMain: " + lenMain);
                 }
-                else if (lines[i].StartsWith("/"))
+                else
                 {
                     parsePfLine(dictMain, lines[i]);
                     //Console.WriteLine(dictMain.Last().ToString());
                 }
 
             }
-            this.fullName = dictFontInfo["/FullName"];
-            this.familyName = dictFontInfo["/FamilyName"];
-            this.version = dictFontInfo["/version"];
-            this.weight = dictFontInfo["/Weight"];
+            this.fullName = dictFontInfo["FullName"];
+            this.familyName = dictFontInfo["FamilyName"];
+            this.version = dictFontInfo["version"];
+            this.weight = dictFontInfo["Weight"];
         }
 
         public override string ToString()
@@ -274,7 +281,7 @@ namespace FontInfo
                 //Console.WriteLine(nameRecords.Last().ToString());
             }
             //Format v1? Then we have lang tags too.
-            Console.WriteLine("FMT: " + format);
+            //Console.WriteLine("FMT: " + format);
             if (format == 1)
             {
                 langTagRecords = new List<LangTagRecord>();

@@ -90,6 +90,15 @@ namespace FontInfo
             FontInfo fi2 = new FontInfo(@"C:\Windows\Fonts\SEAGULLH.pfb");
             fi2.readInfo();
             Console.WriteLine(fi2.ToString());
+
+            FontInfo fi3 =  new FontInfo(@"C:\Windows\Fonts\BNBI___.PFB");
+            fi3.readInfo();
+            Console.WriteLine(fi3.ToString());
+
+            FontInfo fi4 = new FontInfo(@"C:\Windows\Fonts\50ROSSL.PFB");
+            fi4.readInfo();
+            Console.WriteLine(fi4.ToString());
+
             Assert.AreEqual(FontInfo.fontType.PFA, fi.Type);
         }
     }
