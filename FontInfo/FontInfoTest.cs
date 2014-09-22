@@ -101,5 +101,25 @@ namespace FontInfo
 
             Assert.AreEqual(FontInfo.fontType.PFA, fi.Type);
         }
+
+        [Test]
+        public void Test3B2()
+        {
+            FontInfo fi = new FontInfo(@"C:\3B2WIN\AVENIR.FNT");
+            fi.readInfo();
+
+            foreach (var f in fi.ThreeB2Names)
+            {
+                Console.WriteLine(f);
+            }
+
+            FontInfo fi2 = new FontInfo(@"C:\3B2WIN\xmaths.FNT");
+            fi2.readInfo();
+
+            foreach (var f in fi2.ThreeB2Names)
+            {
+                Console.WriteLine(f);
+            }
+        }
     }
 }

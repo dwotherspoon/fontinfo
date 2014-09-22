@@ -10,7 +10,7 @@ namespace FontInfo
 {
     public class FontInfo
     {
-        public enum fontType { TTF, OTF, FON, TTC, PFB, PFA, ERR };
+        public enum fontType { TTF, OTF, FNT, TTC, PFB, PFA, ERR };
         private fontType type = fontType.ERR;
         public fontType Type
         {
@@ -22,6 +22,13 @@ namespace FontInfo
         {
             get { return fullName; }
         }
+
+        private Dictionary<string, string> threeB2Names; //sns => snl
+        public Dictionary<string, string> ThreeB2Names 
+        {
+            get { return threeB2Names; }
+        }
+
 
         private string familyName;
         public string FamilyName
@@ -65,8 +72,11 @@ namespace FontInfo
             if (!File.Exists(file)) throw new FileNotFoundException();
             this.reader = new BinaryReader(new FileStream(file, FileMode.Open, FileAccess.Read));
             byte[] magic_num = reader.ReadBytes(4);
-
-            if (magic_num.SequenceEqual(new byte[] { 0x00, 0x01, 0x00, 0x00 }))
+            if (file.Substring(file.Length - 4, 4).ToUpper() == ".FNT")
+            {
+                type = fontType.FNT;
+            }
+            else if (magic_num.SequenceEqual(new byte[] { 0x00, 0x01, 0x00, 0x00 }))
             {
                 type = fontType.TTF;
             }
@@ -104,6 +114,9 @@ namespace FontInfo
                 case fontType.PFA:
                     parsePFB();
                     break;
+                case fontType.FNT:
+                    parse3B2();
+                    break;
                 default:
                     break;
             }
@@ -121,7 +134,7 @@ namespace FontInfo
             UInt16 searchRange = reverse(reader.ReadUInt16());
             UInt16 entrySelector = reverse(reader.ReadUInt16());
             UInt16 rangeShift = reverse(reader.ReadUInt16());
-            List<FTable> tables = new List<FTable>();
+            List<FTable> tables = new List<FTable>(); //could really be array
             FTable_Name ntable = null;
 
             for (int t = 0; t < numTables; t++)
@@ -134,6 +147,7 @@ namespace FontInfo
             }
                 if (ntable.hasRecord(4, 0, 1, 0))
                 {
+                    Console.WriteLine("Platform 1");
                     fullName = ntable.getString(4, 0, 1, 0);
                     familyName = ntable.getString(1, 0, 1, 0);
                     version = ntable.getString(5, 0, 1, 0);
@@ -141,6 +155,7 @@ namespace FontInfo
                 }
                 else if (ntable.hasRecord(4, 0x409, 3, 1))
                 {
+                    Console.WriteLine("Platform 3");
                     fullName = ntable.getString(4, 0x409, 3, 1);
                     familyName = ntable.getString(1, 0x409, 3, 1);
                     version = ntable.getString(5, 0x409, 3, 1);
@@ -153,6 +168,26 @@ namespace FontInfo
                     version = "ERR";
                     weight = "ERR";
                 }
+        }
+
+        //3B2 Binary fonts only,
+        private void parse3B2() 
+        {
+            bool last;
+            string sns;
+            string snl;
+            threeB2Names = new Dictionary<string, string>();
+            reader.BaseStream.Seek(0x00, SeekOrigin.Begin);
+            do
+            {
+                last = reader.ReadByte() == 0x00;
+                reader.BaseStream.Seek(0x0F, SeekOrigin.Current);
+                sns = ASCIIEncoding.UTF8.GetString(reader.ReadBytes(0x10).TakeWhile(b => b != 0).ToArray());
+                snl = ASCIIEncoding.UTF8.GetString(reader.ReadBytes(0x30).TakeWhile(b => b != 0).ToArray());
+                reader.BaseStream.Seek(0x400 - 0x50, SeekOrigin.Current);
+                threeB2Names[sns] = snl;
+            }
+            while (!last);
         }
 
         private static void parsePfLine(Dictionary<string, string> dict, string line)
